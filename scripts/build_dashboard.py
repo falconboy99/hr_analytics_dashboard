@@ -110,7 +110,14 @@ def main():
 
     with open(os.path.join(ROOT, "dashboard", "template.html")) as f:
         tpl = f.read()
-    out = tpl.replace("/*__HR_DATA__*/null", json.dumps(payload, separators=(",", ":")))
+    page = tpl.replace("/*__HR_DATA__*/null", json.dumps(payload, separators=(",", ":")))
+    # The template is a page fragment (Claude Artifact format); wrap it in a full document
+    # so index.html also works when opened directly or served by Netlify.
+    head, body = page.split("</style>", 1)
+    out = ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
+           "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
+           + head + "body { margin: 0; }\n[hidden] { display: none !important; }\n</style>\n</head>\n<body>\n"
+           + body + "\n</body>\n</html>\n")
     with open(os.path.join(ROOT, "dashboard", "index.html"), "w") as f:
         f.write(out)
     print(f"dashboard/index.html written ({len(out) / 1024:.0f} KB, {len(rows)} employees, {len(att_rows)} attendance rows)")

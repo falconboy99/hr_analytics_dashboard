@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>HR Analytics Dashboard</title>
 <meta name="description" content="Workforce, attrition, attendance and salary analytics for HR teams">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -117,7 +122,12 @@ footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
   .kpi .v { font-size: 22px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+body { margin: 0; }
+[hidden] { display: none !important; }
 </style>
+</head>
+<body>
+
 
 <div class="wrap">
   <header class="top">
@@ -513,3 +523,6 @@ try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rend
 if (window.Chart) { Chart.defaults.font.family = "Hanken Grotesk, system-ui, sans-serif"; }
 showTab();
 </script>
+
+</body>
+</html>

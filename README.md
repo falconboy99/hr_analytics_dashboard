@@ -60,6 +60,15 @@ Open `dashboard/index.html` in any browser. It loads Chart.js and two Google Fon
 
 The page follows the system light/dark setting.
 
+### Deploy on Netlify
+
+The repository is ready for Netlify: `netlify.toml` publishes the `dashboard/` folder as a static site, with no build step.
+
+1. In Netlify choose **Add new site → Import an existing project → GitHub** and pick this repository.
+2. Leave the build settings as they are (they are read from `netlify.toml`) and click **Deploy**.
+
+Every push to `main` redeploys the site. After changing the data, run `make dashboard` and commit the rebuilt `dashboard/index.html`.
+
 ### Power BI
 
 `.pbix` files are binary and must be saved from Power BI Desktop, so this repository ships the full build kit instead: Power Query scripts for every table, 40+ DAX measures, a matching report theme and a page-by-page layout. Follow [`powerbi/BUILD_GUIDE.md`](powerbi/BUILD_GUIDE.md); it takes about 30 minutes, and the finished file can be saved back into `powerbi/`.

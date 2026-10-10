@@ -1,0 +1,11 @@
+# Netlify: serve the prebuilt static dashboard. No build step is needed because
+# dashboard/index.html is committed; run `make dashboard` locally after changing the data.
+[build]
+  publish = "dashboard"
+  command = ""
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
