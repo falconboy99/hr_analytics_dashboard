@@ -1,0 +1,219 @@
+// =====================================================================
+// HR Analytics Dashboard : DAX measures for Power BI
+// Tables: Employees, SalaryHistory, PerformanceReviews, Attendance,
+//         Departments, 'Date' (see power_query.m)
+// Relationships:
+//   'Date'[Date] 1--* Employees[hire_date]          (active)
+//   'Date'[Date] 1--* Employees[termination_date]   (inactive, used with USERELATIONSHIP)
+//   'Date'[Date] 1--* Attendance[month]             (active)
+//   Departments[department_id] 1--* Employees[department_id]
+//   Employees[employee_id] 1--* Attendance / SalaryHistory / PerformanceReviews
+// Create a blank table called _Measures and paste these into it.
+// =====================================================================
+
+// ---------- Headcount ----------
+Headcount (Period End) =
+VAR _end = MAX ( 'Date'[Date] )
+RETURN
+    CALCULATE (
+        COUNTROWS ( Employees ),
+        REMOVEFILTERS ( 'Date' ),
+        Employees[hire_date] <= _end,
+        ISBLANK ( Employees[termination_date] ) || Employees[termination_date] > _end
+    )
+
+Headcount (Period Start) =
+VAR _start = MIN ( 'Date'[Date] )
+RETURN
+    CALCULATE (
+        COUNTROWS ( Employees ),
+        REMOVEFILTERS ( 'Date' ),
+        Employees[hire_date] < _start,
+        ISBLANK ( Employees[termination_date] ) || Employees[termination_date] >= _start
+    )
+
+Average Headcount =
+AVERAGEX (
+    VALUES ( 'Date'[Month Start] ),
+    DIVIDE ( [Headcount (Period Start)] + [Headcount (Period End)], 2 )
+)
+
+Active Employees =
+CALCULATE ( COUNTROWS ( Employees ), Employees[employment_status] = "Active" )
+
+New Hires =
+COUNTROWS ( Employees )    // filtered by the active hire_date relationship
+
+Exits =
+CALCULATE (
+    COUNTROWS ( Employees ),
+    USERELATIONSHIP ( 'Date'[Date], Employees[termination_date] )
+)
+
+Voluntary Exits =
+CALCULATE ( [Exits], Employees[termination_type] = "Voluntary" )
+
+Net Headcount Change = [New Hires] - [Exits]
+
+// ---------- Attrition ----------
+Attrition Rate % =
+VAR _months = DISTINCTCOUNT ( 'Date'[Month Start] )
+RETURN
+    DIVIDE ( [Exits], [Average Headcount] ) * DIVIDE ( 12, _months ) * 100     // annualised
+
+Voluntary Attrition Rate % =
+VAR _months = DISTINCTCOUNT ( 'Date'[Month Start] )
+RETURN
+    DIVIDE ( [Voluntary Exits], [Average Headcount] ) * DIVIDE ( 12, _months ) * 100
+
+Attrition Rate % (TTM) =
+CALCULATE (
+    [Attrition Rate %],
+    DATESINPERIOD ( 'Date'[Date], MAX ( 'Date'[Date] ), -12, MONTH )
+)
+
+Attrition Rate % (TTM, Prior Year) =
+CALCULATE ( [Attrition Rate % (TTM)], DATEADD ( 'Date'[Date], -12, MONTH ) )
+
+Attrition Change (pts) = [Attrition Rate % (TTM)] - [Attrition Rate % (TTM, Prior Year)]
+
+Leaver Share % =                          // share of employees in the current slice who have left
+DIVIDE (
+    CALCULATE ( COUNTROWS ( Employees ), Employees[attrition] = "Yes", REMOVEFILTERS ( 'Date' ) ),
+    CALCULATE ( COUNTROWS ( Employees ), REMOVEFILTERS ( 'Date' ) )
+) * 100
+
+First-Year Exit Share % =
+DIVIDE (
+    CALCULATE ( [Exits], Employees[tenure_years] < 1 ),
+    [Exits]
+) * 100
+
+Regretted Exits =
+CALCULATE ( [Exits], Employees[termination_type] = "Voluntary", Employees[latest_performance_rating] >= 4 )
+
+Flight Risk Score =                       // use in a table with Employees[employee_id]
+VAR e = SELECTEDVALUE ( Employees[employee_id] )
+RETURN
+    IF (
+        NOT ISBLANK ( e ),
+        MIN (
+            100,
+            IF ( SELECTEDVALUE ( Employees[overtime] ) = "Yes", 25, 0 )
+                + ( 4 - SELECTEDVALUE ( Employees[job_satisfaction] ) ) * 12
+                + ( 4 - SELECTEDVALUE ( Employees[work_life_balance] ) ) * 6
+                + IF ( SELECTEDVALUE ( Employees[job_level] ) <= 2, 10, 0 )
+                + IF ( SELECTEDVALUE ( Employees[distance_from_home_km] ) > 25, 8, 0 )
+                + IF ( SELECTEDVALUE ( Employees[years_since_last_promotion] ) >= 3, 8, 0 )
+        )
+    )
+
+// ---------- Employee profile ----------
+Average Tenure (yrs) =
+CALCULATE ( AVERAGE ( Employees[tenure_years] ), Employees[employment_status] = "Active" )
+
+Average Age =
+CALCULATE ( AVERAGE ( Employees[age] ), Employees[employment_status] = "Active" )
+
+Female Share % =
+DIVIDE (
+    CALCULATE ( [Active Employees], Employees[gender] = "Female" ),
+    [Active Employees]
+) * 100
+
+Overtime Share % =
+DIVIDE ( CALCULATE ( [Active Employees], Employees[overtime] = "Yes" ), [Active Employees] ) * 100
+
+Average Performance Rating =
+AVERAGE ( PerformanceReviews[performance_rating] )
+
+High Performer Share % =
+DIVIDE (
+    CALCULATE ( COUNTROWS ( PerformanceReviews ), PerformanceReviews[performance_rating] >= 4 ),
+    COUNTROWS ( PerformanceReviews )
+) * 100
+
+Average Job Satisfaction =
+CALCULATE ( AVERAGE ( Employees[job_satisfaction] ), Employees[employment_status] = "Active" )
+
+// ---------- Attendance ----------
+Scheduled Days = SUM ( Attendance[scheduled_days] )
+Days Present  = SUM ( Attendance[days_present] )
+
+Attendance Rate % = DIVIDE ( [Days Present], [Scheduled Days] ) * 100
+
+Absenteeism Rate % =
+DIVIDE (
+    SUM ( Attendance[sick_leave_days] ) + SUM ( Attendance[unplanned_absence_days] ),
+    [Scheduled Days]
+) * 100
+
+Unplanned Absence Days per Employee (annualised) =
+DIVIDE (
+    SUM ( Attendance[unplanned_absence_days] ),
+    COUNTROWS ( Attendance )             // one row = one employee-month
+) * 12
+
+Late Arrival Rate % = DIVIDE ( SUM ( Attendance[late_arrivals] ), [Days Present] ) * 100
+
+Overtime Hours per Employee-Month = DIVIDE ( SUM ( Attendance[overtime_hours] ), COUNTROWS ( Attendance ) )
+
+Remote Day Share % = DIVIDE ( SUM ( Attendance[remote_days] ), [Days Present] ) * 100
+
+// ---------- Salary ----------
+Total Payroll (INR) =
+CALCULATE ( SUM ( Employees[annual_salary] ), Employees[employment_status] = "Active" )
+
+Total Payroll (INR Cr) = DIVIDE ( [Total Payroll (INR)], 1e7 )
+
+Median Salary =
+CALCULATE ( MEDIAN ( Employees[annual_salary] ), Employees[employment_status] = "Active" )
+
+Average Salary =
+CALCULATE ( AVERAGE ( Employees[annual_salary] ), Employees[employment_status] = "Active" )
+
+Band Median Salary =                       // median for the same department and level
+VAR d = SELECTEDVALUE ( Employees[department] )
+VAR l = SELECTEDVALUE ( Employees[job_level] )
+RETURN
+    CALCULATE (
+        MEDIAN ( Employees[annual_salary] ),
+        REMOVEFILTERS ( Employees ),
+        Employees[employment_status] = "Active",
+        Employees[department] = d,
+        Employees[job_level] = l
+    )
+
+Average Compa-Ratio =
+AVERAGEX (
+    FILTER ( Employees, Employees[employment_status] = "Active" ),
+    VAR d = Employees[department]
+    VAR l = Employees[job_level]
+    VAR med =
+        CALCULATE (
+            MEDIAN ( Employees[annual_salary] ),
+            REMOVEFILTERS ( Employees ),
+            Employees[employment_status] = "Active",
+            Employees[department] = d,
+            Employees[job_level] = l
+        )
+    RETURN DIVIDE ( Employees[annual_salary], med )
+)
+
+Gender Pay Gap (compa pts) =
+( CALCULATE ( [Average Compa-Ratio], Employees[gender] = "Male" )
+    - CALCULATE ( [Average Compa-Ratio], Employees[gender] = "Female" ) ) * 100
+
+Raw Gender Pay Gap % =
+VAR m = CALCULATE ( [Median Salary], Employees[gender] = "Male" )
+VAR f = CALCULATE ( [Median Salary], Employees[gender] = "Female" )
+RETURN DIVIDE ( m - f, m ) * 100
+
+Average Increment % =
+CALCULATE ( AVERAGE ( SalaryHistory[increment_pct] ), SalaryHistory[change_reason] <> "Hire" )
+
+Promotion Rate % =
+DIVIDE (
+    CALCULATE ( COUNTROWS ( SalaryHistory ), SalaryHistory[change_reason] = "Promotion" ),
+    CALCULATE ( COUNTROWS ( SalaryHistory ), SalaryHistory[change_reason] <> "Hire" )
+) * 100

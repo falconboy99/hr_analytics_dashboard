@@ -1,0 +1,515 @@
+<title>HR Analytics Dashboard</title>
+<meta name="description" content="Workforce, attrition, attendance and salary analytics for HR teams">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Hanken+Grotesk:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky filter bar over a tabbed workspace; KPI strip first, then charts in a 2-col grid that stacks on phones. */
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --ink: #111722;
+  --ink-2: #4b5466;
+  --muted: #7f8796;
+  --grid: #e4e7ed;
+  --line: #ccd2dc;
+  --accent: #2650c4;
+  --accent-wash: #e6ecfb;
+  --good: #0f7a35;
+  --bad: #b8322f;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --font-display: "Bricolage Grotesque", "Hanken Grotesk", system-ui, sans-serif;
+  --font-body: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1015; --surface: #161a21; --ink: #eef1f5; --ink-2: #b7becb; --muted: #858d9b;
+    --grid: #262b34; --line: #39404c; --accent: #8aa8ff; --accent-wash: #1d2638;
+    --good: #3fbf6a; --bad: #f07a76;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1015; --surface: #161a21; --ink: #eef1f5; --ink-2: #b7becb; --muted: #858d9b;
+  --grid: #262b34; --line: #39404c; --accent: #8aa8ff; --accent-wash: #1d2638;
+  --good: #3fbf6a; --bad: #f07a76;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1280px; margin: 0 auto; padding-inline: 20px; padding-block: 20px 48px; }
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.sub { color: var(--ink-2); margin: 4px 0 0; }
+.asof { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 12px; margin-top: 12px; border-bottom: 1px solid var(--grid); }
+.filters { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; }
+.filters label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+select, button { font: inherit; color: var(--ink); }
+select { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 28px 6px 10px; min-width: 140px; font-size: 14px; text-transform: none; letter-spacing: 0; }
+select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.reset { background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.reset:hover { background: var(--accent-wash); }
+.count { margin-left: auto; color: var(--ink-2); font-size: 13px; align-self: center; }
+
+nav.tabs { display: flex; gap: 4px; margin-top: 12px; overflow-x: auto; }
+nav.tabs button { background: transparent; border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; color: var(--ink-2); font-weight: 500; white-space: nowrap; }
+nav.tabs button:hover { background: var(--accent-wash); color: var(--ink); }
+nav.tabs button[aria-selected="true"] { background: var(--accent-wash); color: var(--accent); font-weight: 600; }
+
+.kpis { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+.kpi { background: var(--surface); border: 1px solid var(--grid); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kpi .k { font-size: 12px; color: var(--ink-2); }
+.kpi .v { font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; }
+.kpi .n { font-size: 12px; color: var(--muted); }
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; width: fit-content; }
+.pill.bad { color: var(--bad); } .pill.good { color: var(--good); } .pill.neutral { color: var(--muted); }
+
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.card { background: var(--surface); border: 1px solid var(--grid); border-radius: var(--radius); padding: 16px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.card.wide { grid-column: 1 / -1; }
+.card h2 { font-family: var(--font-display); font-weight: 500; font-size: 16px; margin: 0; }
+.card .note { color: var(--muted); font-size: 12px; margin: 0; }
+.chart { position: relative; height: 260px; }
+.chart.tall { height: 320px; }
+.chart.short { height: 200px; }
+.drivers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.drivers .chart { height: 180px; }
+.drivers h3 { font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 0 0 4px; }
+
+.insights { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.insights li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; }
+.insights .ic { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+.insights .ic.bad { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.insights .ic.good { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+.insights .ic.info { background: var(--accent-wash); color: var(--accent); }
+
+.tbl { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.risk { display: inline-block; min-width: 38px; text-align: center; padding: 1px 6px; border-radius: 6px; font-weight: 600; }
+.risk.hi { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
+.risk.md { background: color-mix(in srgb, var(--s4) 20%, transparent); color: var(--ink); }
+
+footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
+.empty { color: var(--muted); padding: 24px; text-align: center; }
+
+@media (max-width: 1000px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 860px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .drivers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .count { margin-left: 0; width: 100%; }
+}
+@media (max-width: 480px) {
+  .wrap { padding-inline: 16px; }
+  select { min-width: 0; width: 100%; }
+  .filters label { flex: 1 1 45%; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi .v { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>HR Analytics Dashboard</h1>
+      <p class="sub">Workforce, attrition, attendance and pay for 8 departments across 5 locations.</p>
+    </div>
+    <div class="asof" id="asof">Data as of 30 Sep 2026</div>
+  </header>
+
+  <div class="bar">
+    <div class="filters" role="group" aria-label="Filters">
+      <label for="f-dept">Department <select id="f-dept"></select></label>
+      <label for="f-loc">Location <select id="f-loc"></select></label>
+      <label for="f-gender">Gender <select id="f-gender"></select></label>
+      <label for="f-mode">Work mode <select id="f-mode"></select></label>
+      <button class="reset" id="reset" type="button">Reset filters</button>
+      <span class="count" id="count"></span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Dashboard sections">
+      <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+      <button role="tab" data-tab="workforce" aria-selected="false">Employees</button>
+      <button role="tab" data-tab="attrition" aria-selected="false">Attrition</button>
+      <button role="tab" data-tab="attendance" aria-selected="false">Attendance</button>
+      <button role="tab" data-tab="salary" aria-selected="false">Salary</button>
+    </nav>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section data-panel="overview">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid">
+      <div class="card"><h2>Month-end headcount</h2><p class="note">Active employees at each month end, Jan 2019 to Sep 2026</p><div class="chart"><canvas id="c-headcount"></canvas></div></div>
+      <div class="card"><h2>Attrition rate by year</h2><p class="note">Exits ÷ average headcount. 2026 is annualised from 9 months.</p><div class="chart"><canvas id="c-attr-year"></canvas></div></div>
+      <div class="card wide"><h2>What stands out</h2><ul class="insights" id="insights"></ul></div>
+    </div>
+  </section>
+
+  <!-- WORKFORCE -->
+  <section data-panel="workforce" hidden>
+    <div class="grid">
+      <div class="card"><h2>Active headcount by department</h2><div class="chart"><canvas id="c-dept-hc"></canvas></div></div>
+      <div class="card"><h2>Hires and exits by year</h2><p class="note">2026 covers January to September</p><div class="chart"><canvas id="c-hires-exits"></canvas></div></div>
+      <div class="card"><h2>Gender mix by department</h2><p class="note">Share of active employees</p><div class="chart"><canvas id="c-gender"></canvas></div></div>
+      <div class="card"><h2>Performance ratings, 2025 cycle</h2><p class="note">Latest rating of active employees (1 = below, 5 = outstanding)</p><div class="chart"><canvas id="c-rating"></canvas></div></div>
+      <div class="card"><h2>Age bands</h2><div class="chart short"><canvas id="c-age"></canvas></div></div>
+      <div class="card"><h2>Tenure bands</h2><div class="chart short"><canvas id="c-tenure"></canvas></div></div>
+      <div class="card wide"><h2>Location and work mode</h2><div class="chart short"><canvas id="c-loc"></canvas></div></div>
+    </div>
+  </section>
+
+  <!-- ATTRITION -->
+  <section data-panel="attrition" hidden>
+    <div class="grid">
+      <div class="card"><h2>Attrition rate by department</h2><p class="note">Trailing 12 months to Sep 2026</p><div class="chart"><canvas id="c-attr-dept"></canvas></div></div>
+      <div class="card"><h2>Why people left</h2><p class="note">Exits in the last 24 months, by reason</p><div class="chart"><canvas id="c-reasons"></canvas></div></div>
+      <div class="card wide"><h2>Attrition drivers</h2><p class="note">Share of everyone hired since 2016 who has since left, by group</p>
+        <div class="drivers">
+          <div><h3>Overtime</h3><div class="chart"><canvas id="c-d-ot"></canvas></div></div>
+          <div><h3>Job satisfaction (1–4)</h3><div class="chart"><canvas id="c-d-sat"></canvas></div></div>
+          <div><h3>Work-life balance (1–4)</h3><div class="chart"><canvas id="c-d-wlb"></canvas></div></div>
+          <div><h3>Job level</h3><div class="chart"><canvas id="c-d-level"></canvas></div></div>
+        </div>
+      </div>
+      <div class="card"><h2>Exits by tenure at leaving</h2><div class="chart short"><canvas id="c-exit-tenure"></canvas></div></div>
+      <div class="card"><h2>Monthly exits</h2><p class="note">Voluntary and involuntary, last 24 months</p><div class="chart short"><canvas id="c-exit-month"></canvas></div></div>
+      <div class="card wide"><h2>Flight-risk watchlist</h2><p class="note">Active employees ranked by a 0–100 score built from the drivers above: overtime, satisfaction, work-life balance, level, commute and time since promotion.</p>
+        <div class="tbl"><table id="t-risk"><thead><tr><th>Employee</th><th>Department</th><th>Role</th><th class="num">Rating</th><th class="num">Job sat.</th><th class="num">Yrs since promo</th><th>Overtime</th><th class="num">Score</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ATTENDANCE -->
+  <section data-panel="attendance" hidden>
+    <div class="kpis" id="kpis-att" style="--cols: 5"></div>
+    <div class="grid">
+      <div class="card"><h2>Attendance rate by month</h2><p class="note">Days present ÷ scheduled days</p><div class="chart"><canvas id="c-att-rate"></canvas></div></div>
+      <div class="card"><h2>Leave days per employee</h2><p class="note">Average per employee per month, by leave type</p><div class="chart"><canvas id="c-leave-mix"></canvas></div></div>
+      <div class="card"><h2>Absenteeism by department</h2><p class="note">Sick + unplanned days ÷ scheduled days, last 12 months</p><div class="chart"><canvas id="c-abs-dept"></canvas></div></div>
+      <div class="card"><h2>Overtime by department</h2><p class="note">Average overtime hours per employee per month, last 12 months</p><div class="chart"><canvas id="c-ot-dept"></canvas></div></div>
+    </div>
+  </section>
+
+  <!-- SALARY -->
+  <section data-panel="salary" hidden>
+    <div class="kpis" id="kpis-sal" style="--cols: 5"></div>
+    <div class="grid">
+      <div class="card"><h2>Median salary by department</h2><p class="note">Annual, active employees, ₹ lakh</p><div class="chart"><canvas id="c-sal-dept"></canvas></div></div>
+      <div class="card"><h2>Salary range by job level</h2><p class="note">25th percentile, median and 75th percentile, ₹ lakh</p><div class="chart"><canvas id="c-sal-level"></canvas></div></div>
+      <div class="card"><h2>Pay position by gender</h2><p class="note">Average compa-ratio: salary ÷ median for the same department and level (1.00 = at median)</p><div class="chart"><canvas id="c-compa"></canvas></div></div>
+      <div class="card"><h2>April 2026 increment by rating</h2><p class="note">Average increment %, including promotions</p><div class="chart"><canvas id="c-inc"></canvas></div></div>
+      <div class="card wide"><h2>Salary bands</h2><div class="chart short"><canvas id="c-sal-band"></canvas></div></div>
+    </div>
+  </section>
+
+  <footer>Synthetic dataset of 2,200 employees (2016–2026) generated for this project. All names and figures are fictional. Salaries in Indian rupees; 1 lakh = ₹1,00,000, 1 crore = ₹1,00,00,000.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const D = /*__HR_DATA__*/null;
+const C = D.empCols.reduce((o, k, i) => (o[k] = i, o), {});
+const A = D.attCols.reduce((o, k, i) => (o[k] = i, o), {});
+const NOW = D.asOfIdx;                 // month index of Sep 2026
+const TTM0 = NOW - 11;                 // first month of trailing 12
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const mLabel = i => MON[i % 12] + " " + String(D.baseYear + Math.floor(i / 12)).slice(2);
+const yearOf = i => D.baseYear + Math.floor(i / 12);
+
+// ---------- formatting ----------
+const fmtInt = n => n.toLocaleString("en-IN");
+const fmtPct = (n, d = 1) => (isFinite(n) ? n.toFixed(d) : "–") + "%";
+const lakh = n => n / 1e5;
+const fmtLakh = n => "₹" + lakh(n).toFixed(1) + " L";
+const median = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const quant = (a, q) => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), p = (s.length - 1) * q, b = Math.floor(p); return s[b] + (s[Math.min(b + 1, s.length - 1)] - s[b]) * (p - b); };
+const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN;
+
+// ---------- theme tokens ----------
+let T = {};
+function readTokens() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = k => cs.getPropertyValue(k).trim();
+  T = { ink: g("--ink"), ink2: g("--ink-2"), muted: g("--muted"), grid: g("--grid"), line: g("--line"),
+        surface: g("--surface"), accent: g("--accent"), bad: g("--bad"), good: g("--good"),
+        s: [1,2,3,4,5,6,7,8].map(i => g("--s" + i)) };
+}
+
+// ---------- filters ----------
+const F = { dept: -1, loc: -1, gender: -1, mode: -1 };
+function fillSelect(id, items, key) {
+  const el = document.getElementById(id);
+  el.innerHTML = `<option value="-1">All</option>` + items.map((t, i) => `<option value="${i}">${t}</option>`).join("");
+  el.addEventListener("change", () => { F[key] = +el.value; render(); });
+}
+fillSelect("f-dept", D.depts, "dept");
+fillSelect("f-loc", D.locs, "loc");
+fillSelect("f-gender", D.genders, "gender");
+fillSelect("f-mode", D.modes, "mode");
+document.getElementById("reset").addEventListener("click", () => {
+  for (const k in F) F[k] = -1;
+  ["f-dept","f-loc","f-gender","f-mode"].forEach(id => document.getElementById(id).value = "-1");
+  render();
+});
+const pass = e => (F.dept < 0 || e[C.dept] === F.dept) && (F.loc < 0 || e[C.loc] === F.loc)
+               && (F.gender < 0 || e[C.gender] === F.gender) && (F.mode < 0 || e[C.mode] === F.mode);
+const passAtt = r => (F.dept < 0 || r[A.dept] === F.dept) && (F.loc < 0 || r[A.loc] === F.loc)
+               && (F.gender < 0 || r[A.gender] === F.gender) && (F.mode < 0 || r[A.mode] === F.mode);
+
+// ---------- tabs ----------
+let tab = "overview";
+try { const h = location.hash.slice(1); if (["overview","workforce","attrition","attendance","salary"].includes(h)) tab = h; } catch (e) {}
+document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.tab; showTab(); }));
+function showTab() {
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === tab));
+  document.querySelectorAll("section[data-panel]").forEach(s => s.hidden = s.dataset.panel !== tab);
+  render();
+}
+
+// ---------- workforce maths ----------
+const isActive = e => e[C.term] < 0;
+const activeAt = (e, m) => e[C.hire] <= m && (e[C.term] < 0 || e[C.term] > m);      // month-end
+const activeStart = (e, m) => e[C.hire] < m && (e[C.term] < 0 || e[C.term] >= m);   // month-start
+function avgHeadcount(E, m0, m1) {
+  let s = 0;
+  for (let m = m0; m <= m1; m++) { let a = 0, b = 0; for (const e of E) { if (activeStart(e, m)) a++; if (activeAt(e, m)) b++; } s += (a + b) / 2; }
+  return s / (m1 - m0 + 1);
+}
+function attrRate(E, m0, m1, volOnly) {
+  const exits = E.filter(e => e[C.term] >= m0 && e[C.term] <= m1 && (!volOnly || e[C.termType] === 1)).length;
+  const hc = avgHeadcount(E, m0, m1);
+  return { exits, hc, rate: hc ? 100 * exits / hc * 12 / (m1 - m0 + 1) : NaN };
+}
+function riskScore(e) {
+  return Math.min(100, (e[C.ot] ? 25 : 0) + (4 - e[C.jobSat]) * 12 + (4 - e[C.wlb]) * 6
+    + (e[C.level] <= 2 ? 10 : 0) + (e[C.dist] > 25 ? 8 : 0) + (e[C.yrsPromo] >= 3 ? 8 : 0));
+}
+// Pay bands use every active employee, so compa-ratios stay comparable under filters.
+const bandMed = {};
+(() => { const g = {}; for (const e of D.emps) if (isActive(e)) (g[e[C.dept] + "-" + e[C.level]] ||= []).push(e[C.salary]);
+         for (const k in g) bandMed[k] = median(g[k]); })();
+const compa = e => e[C.salary] / bandMed[e[C.dept] + "-" + e[C.level]];
+
+// ---------- chart helpers ----------
+const charts = {};
+function baseOpts(extra = {}) {
+  return Object.assign({
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false, labels: { color: T.ink2, boxWidth: 10, boxHeight: 10, useBorderRadius: true, borderRadius: 2, font: { family: "Hanken Grotesk, system-ui", size: 12 } } },
+      tooltip: { backgroundColor: T.surface, titleColor: T.ink, bodyColor: T.ink2, borderColor: T.line, borderWidth: 1,
+                 padding: 10, cornerRadius: 8, boxPadding: 4, usePointStyle: true,
+                 titleFont: { family: "Hanken Grotesk, system-ui", weight: "600" }, bodyFont: { family: "Hanken Grotesk, system-ui" } }
+    },
+    scales: {}
+  }, extra);
+}
+function axis(o = {}) {
+  return Object.assign({ grid: { color: T.grid, drawTicks: false }, border: { color: T.line },
+    ticks: { color: T.muted, padding: 6, font: { family: "Hanken Grotesk, system-ui", size: 11 } } }, o);
+}
+function draw(id, cfg) {
+  const el = document.getElementById(id);
+  if (!el || el.closest("section").hidden) return;
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(el, cfg);
+}
+const barDs = (label, data, color, extra = {}) => Object.assign({ label, data, backgroundColor: color, borderRadius: 4, borderSkipped: "start", maxBarThickness: 34, borderColor: T.surface, borderWidth: 0 }, extra);
+function hbar(id, labels, data, color, fmt, extra = {}) {
+  draw(id, { type: "bar", data: { labels, datasets: [barDs(extra.label || "", data, color)] },
+    options: baseOpts({ indexAxis: "y", interaction: { mode: "nearest", axis: "y", intersect: false },
+      plugins: { ...baseOpts().plugins, tooltip: { ...baseOpts().plugins.tooltip, callbacks: { label: c => " " + fmt(c.parsed.x) } } },
+      scales: { x: axis({ beginAtZero: true, ticks: { ...axis().ticks, callback: v => fmt(v) } }), y: axis({ grid: { display: false } }) } }) });
+}
+function vbar(id, labels, datasets, fmt, extra = {}) {
+  draw(id, { type: "bar", data: { labels, datasets },
+    options: baseOpts({ plugins: { ...baseOpts().plugins, legend: { ...baseOpts().plugins.legend, display: datasets.length > 1 },
+        tooltip: { ...baseOpts().plugins.tooltip, callbacks: { label: c => ` ${c.dataset.label ? c.dataset.label + ": " : ""}${fmt(c.parsed.y)}` } } },
+      scales: { x: axis({ grid: { display: false }, stacked: !!extra.stacked }), y: axis({ beginAtZero: true, stacked: !!extra.stacked, ticks: { ...axis().ticks, callback: v => fmt(v) }, ...(extra.y || {}) }) } }) });
+}
+function line(id, labels, datasets, fmt, y = {}) {
+  draw(id, { type: "line", data: { labels, datasets: datasets.map(d => Object.assign({ borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, pointHoverBorderWidth: 2, pointHoverBorderColor: T.surface, tension: 0.3, cubicInterpolationMode: "monotone" }, d)) },
+    options: baseOpts({ plugins: { ...baseOpts().plugins, legend: { ...baseOpts().plugins.legend, display: datasets.length > 1 },
+        tooltip: { ...baseOpts().plugins.tooltip, callbacks: { label: c => ` ${c.dataset.label ? c.dataset.label + ": " : ""}${fmt(c.parsed.y)}` } } },
+      scales: { x: axis({ grid: { display: false }, ticks: { ...axis().ticks, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } }), y: axis({ ticks: { ...axis().ticks, callback: v => fmt(v) }, ...y }) } }) });
+}
+function kpiHtml(items) {
+  return items.map(k => `<div class="kpi"><span class="k">${k.k}</span><span class="v">${k.v}</span>${k.pill ? `<span class="pill ${k.pill[0]}">${k.pill[1]}</span>` : ""}${k.n ? `<span class="n">${k.n}</span>` : ""}</div>`).join("");
+}
+const groupRate = (E, keyFn, keys) => keys.map(k => { const g = E.filter(e => keyFn(e) === k); return g.length ? 100 * g.filter(e => e[C.term] >= 0).length / g.length : 0; });
+
+// ---------- render ----------
+function render() {
+  readTokens();
+  const E = D.emps.filter(pass);
+  const act = E.filter(isActive);
+  const AT = D.att.filter(passAtt);
+  document.getElementById("count").textContent = `${fmtInt(act.length)} active of ${fmtInt(E.length)} employees in view`;
+  if (!E.length) { document.getElementById("kpis").innerHTML = `<div class="empty">No employees match these filters.</div>`; return; }
+
+  const ttm = attrRate(E, TTM0, NOW), ttmVol = attrRate(E, TTM0, NOW, true), prev = attrRate(E, TTM0 - 12, NOW - 12);
+  const hiresTTM = E.filter(e => e[C.hire] >= TTM0 && e[C.hire] <= NOW).length;
+  const attT = AT.filter(r => r[A.m] >= TTM0);
+  const sum = (rows, k) => rows.reduce((s, r) => s + r[A[k]], 0);
+  const attRate = 100 * sum(attT, "present") / sum(attT, "sched");
+  const absRate = 100 * (sum(attT, "sick") + sum(attT, "unplanned")) / sum(attT, "sched");
+  const rated = act.filter(e => e[C.rating] > 0);
+  const delta = ttm.rate - prev.rate;
+
+  if (tab === "overview") {
+    document.getElementById("kpis").innerHTML = kpiHtml([
+      { k: "Active headcount", v: fmtInt(act.length), n: `${fmtInt(hiresTTM)} hired in the last 12 months` },
+      { k: "Attrition rate, last 12 months", v: fmtPct(ttm.rate), pill: [delta > 0.5 ? "bad" : delta < -0.5 ? "good" : "neutral", `${delta >= 0 ? "▲" : "▼"} ${Math.abs(delta).toFixed(1)} pts vs prior year`] },
+      { k: "Voluntary attrition", v: fmtPct(ttmVol.rate), n: `${fmtInt(ttm.exits)} exits, ${fmtInt(ttmVol.exits)} voluntary` },
+      { k: "Average tenure", v: mean(act.map(e => e[C.tenure])).toFixed(1) + " yrs", n: `Average age ${mean(act.map(e => e[C.age])).toFixed(0)}` },
+      { k: "Median salary", v: fmtLakh(median(act.map(e => e[C.salary]))), n: `Payroll ₹${(act.reduce((s, e) => s + e[C.salary], 0) / 1e7).toFixed(1)} Cr a year` },
+      { k: "Attendance rate", v: fmtPct(attRate), n: `Absenteeism ${fmtPct(absRate, 2)}, last 12 months` },
+      { k: "Average rating, 2025", v: mean(rated.map(e => e[C.rating])).toFixed(2), n: `${fmtPct(100 * rated.filter(e => e[C.rating] >= 4).length / rated.length, 0)} rated 4 or 5` },
+      { k: "Women in workforce", v: fmtPct(100 * act.filter(e => e[C.gender] === 0).length / act.length, 0), n: `${fmtPct(100 * act.filter(e => e[C.ot]).length / act.length, 0)} work regular overtime` },
+    ]);
+    const m0 = (2019 - D.baseYear) * 12, ms = []; for (let m = m0; m <= NOW; m++) ms.push(m);
+    line("c-headcount", ms.map(mLabel), [{ label: "Headcount", data: ms.map(m => E.filter(e => activeAt(e, m)).length), borderColor: T.s[0], backgroundColor: T.s[0] + "22", fill: true }], v => fmtInt(Math.round(v)), { beginAtZero: false });
+    const yrs = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+    const yr = yrs.map(y => { const a = (y - D.baseYear) * 12; return attrRate(E, a, Math.min(a + 11, NOW)); });
+    vbar("c-attr-year", yrs.map(y => y === 2026 ? "2026*" : String(y)), [barDs("Attrition rate", yr.map(r => +r.rate.toFixed(1)), T.s[1])], v => v + "%");
+    insights(E, act, ttm, absRate);
+  }
+
+  if (tab === "workforce") {
+    const dc = D.depts.map((d, i) => [d, act.filter(e => e[C.dept] === i).length]).sort((a, b) => b[1] - a[1]);
+    hbar("c-dept-hc", dc.map(d => d[0]), dc.map(d => d[1]), T.s[0], v => fmtInt(v));
+    const yrs = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+    vbar("c-hires-exits", yrs.map(String), [
+      barDs("Hires", yrs.map(y => E.filter(e => yearOf(e[C.hire]) === y).length), T.s[0]),
+      barDs("Exits", yrs.map(y => E.filter(e => e[C.term] >= 0 && yearOf(e[C.term]) === y).length), T.s[1])], v => fmtInt(v));
+    const depts = D.depts.map((d, i) => i).filter(i => act.some(e => e[C.dept] === i));
+    draw("c-gender", { type: "bar", data: { labels: depts.map(i => D.depts[i]), datasets: D.genders.map((g, gi) => barDs(g, depts.map(i => { const a = act.filter(e => e[C.dept] === i); return +(100 * a.filter(e => e[C.gender] === gi).length / a.length).toFixed(1); }), T.s[gi === 0 ? 0 : gi === 1 ? 2 : 6], { borderRadius: 0, borderWidth: { right: 2 }, borderSkipped: false, maxBarThickness: 22 })) },
+      options: baseOpts({ indexAxis: "y", interaction: { mode: "index", axis: "y", intersect: false }, plugins: { ...baseOpts().plugins, legend: { ...baseOpts().plugins.legend, display: true, position: "top", align: "start" },
+        tooltip: { ...baseOpts().plugins.tooltip, callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.x}%` } } },
+        scales: { x: axis({ stacked: true, max: 100, ticks: { ...axis().ticks, callback: v => v + "%" } }), y: axis({ stacked: true, grid: { display: false } }) } }) });
+    const r = [1, 2, 3, 4, 5]; vbar("c-rating", r.map(String), [barDs("Employees", r.map(x => rated.filter(e => e[C.rating] === x).length), T.s[0])], v => fmtInt(v));
+    const ageB = [["< 25", 0, 25], ["25–34", 25, 35], ["35–44", 35, 45], ["45–54", 45, 55], ["55+", 55, 99]];
+    vbar("c-age", ageB.map(b => b[0]), [barDs("Employees", ageB.map(b => act.filter(e => e[C.age] >= b[1] && e[C.age] < b[2]).length), T.s[0])], v => fmtInt(v));
+    const tenB = [["< 1 yr", 0, 1], ["1–3 yrs", 1, 3], ["3–5 yrs", 3, 5], ["5–10 yrs", 5, 10], ["10+ yrs", 10, 99]];
+    vbar("c-tenure", tenB.map(b => b[0]), [barDs("Employees", tenB.map(b => act.filter(e => e[C.tenure] >= b[1] && e[C.tenure] < b[2]).length), T.s[0])], v => fmtInt(v));
+    vbar("c-loc", D.locs, D.modes.map((m, mi) => barDs(m, D.locs.map((l, li) => act.filter(e => e[C.loc] === li && e[C.mode] === mi).length), T.s[[0, 2, 6][mi]], { borderRadius: 0, borderWidth: { top: 2 }, borderSkipped: false })), v => fmtInt(v), { stacked: true });
+  }
+
+  if (tab === "attrition") {
+    const ad = D.depts.map((d, i) => [d, attrRate(E.filter(e => e[C.dept] === i), TTM0, NOW)]).filter(d => d[1].hc > 0).sort((a, b) => b[1].rate - a[1].rate);
+    hbar("c-attr-dept", ad.map(d => d[0]), ad.map(d => +d[1].rate.toFixed(1)), T.s[1], v => v + "%");
+    const ex24 = E.filter(e => e[C.term] > NOW - 24);
+    const rs = D.reasons.map((r, i) => [r, ex24.filter(e => e[C.reason] === i && e[C.termType] === 1).length, ex24.filter(e => e[C.reason] === i && e[C.termType] === 2).length])
+      .filter(r => r[1] + r[2] > 0).sort((a, b) => (b[1] + b[2]) - (a[1] + a[2]));
+    draw("c-reasons", { type: "bar", data: { labels: rs.map(r => r[0]), datasets: [
+        barDs("Voluntary", rs.map(r => r[1]), T.s[1], { borderRadius: 0, borderWidth: { right: 2 }, borderSkipped: false, maxBarThickness: 20 }),
+        barDs("Involuntary", rs.map(r => r[2]), T.s[6], { borderRadius: 0, borderWidth: { right: 2 }, borderSkipped: false, maxBarThickness: 20 })] },
+      options: baseOpts({ indexAxis: "y", interaction: { mode: "index", axis: "y", intersect: false }, plugins: { ...baseOpts().plugins, legend: { ...baseOpts().plugins.legend, display: true, position: "top", align: "start" } },
+        scales: { x: axis({ stacked: true, beginAtZero: true }), y: axis({ stacked: true, grid: { display: false } }) } }) });
+    const pct = v => v.toFixed(0) + "%";
+    vbar("c-d-ot", ["No", "Yes"], [barDs("Left", groupRate(E, e => e[C.ot], [0, 1]).map(v => +v.toFixed(1)), T.s[1])], pct, { y: { max: 100 } });
+    vbar("c-d-sat", ["1", "2", "3", "4"], [barDs("Left", groupRate(E, e => e[C.jobSat], [1, 2, 3, 4]).map(v => +v.toFixed(1)), T.s[1])], pct, { y: { max: 100 } });
+    vbar("c-d-wlb", ["1", "2", "3", "4"], [barDs("Left", groupRate(E, e => e[C.wlb], [1, 2, 3, 4]).map(v => +v.toFixed(1)), T.s[1])], pct, { y: { max: 100 } });
+    vbar("c-d-level", ["L1", "L2", "L3", "L4", "L5"], [barDs("Left", groupRate(E, e => e[C.level], [1, 2, 3, 4, 5]).map(v => +v.toFixed(1)), T.s[1])], pct, { y: { max: 100 } });
+    const lv = E.filter(e => e[C.term] >= 0), tb = [["< 1 yr", 0, 1], ["1–2 yrs", 1, 2], ["2–3 yrs", 2, 3], ["3–5 yrs", 3, 5], ["5+ yrs", 5, 99]];
+    vbar("c-exit-tenure", tb.map(b => b[0]), [barDs("Exits", tb.map(b => lv.filter(e => e[C.tenure] >= b[1] && e[C.tenure] < b[2]).length), T.s[1])], v => fmtInt(v));
+    const ms = []; for (let m = NOW - 23; m <= NOW; m++) ms.push(m);
+    vbar("c-exit-month", ms.map(mLabel), [
+      barDs("Voluntary", ms.map(m => E.filter(e => e[C.term] === m && e[C.termType] === 1).length), T.s[1], { borderRadius: 0, borderWidth: { top: 2 }, borderSkipped: false }),
+      barDs("Involuntary", ms.map(m => E.filter(e => e[C.term] === m && e[C.termType] === 2).length), T.s[6], { borderRadius: 0, borderWidth: { top: 2 }, borderSkipped: false })], v => fmtInt(v), { stacked: true });
+    const top = act.map(e => [e, riskScore(e)]).sort((a, b) => b[1] - a[1] || b[0][C.rating] - a[0][C.rating]).slice(0, 15);
+    document.querySelector("#t-risk tbody").innerHTML = top.map(([e, s]) => `<tr><td>${e[C.name]} <span style="color:var(--muted)">${e[C.id]}</span></td><td>${D.depts[e[C.dept]]}</td><td>${e[C.role]}</td><td class="num">${e[C.rating] || "–"}</td><td class="num">${e[C.jobSat]}</td><td class="num">${e[C.yrsPromo].toFixed(1)}</td><td>${e[C.ot] ? "Yes" : "No"}</td><td class="num"><span class="risk ${s >= 70 ? "hi" : "md"}">${s}</span></td></tr>`).join("") || `<tr><td colspan="8" class="empty">No active employees in view.</td></tr>`;
+  }
+
+  if (tab === "attendance") {
+    const emT = sum(attT, "empMonths");
+    document.getElementById("kpis-att").innerHTML = kpiHtml([
+      { k: "Attendance rate", v: fmtPct(attRate), n: "Last 12 months" },
+      { k: "Absenteeism rate", v: fmtPct(absRate, 2), n: "Sick + unplanned days" },
+      { k: "Unplanned absence", v: (sum(attT, "unplanned") / emT * 12).toFixed(1) + " days", n: "Per employee per year" },
+      { k: "Late arrivals", v: fmtPct(100 * sum(attT, "late") / sum(attT, "present")), n: "Share of days present" },
+      { k: "Overtime", v: (sum(attT, "otHours") / emT).toFixed(1) + " hrs", n: "Per employee per month" },
+    ]);
+    const ms = [...new Set(AT.map(r => r[A.m]))].sort((a, b) => a - b);
+    const byM = m => AT.filter(r => r[A.m] === m);
+    line("c-att-rate", ms.map(mLabel), [{ label: "Attendance rate", data: ms.map(m => { const r = byM(m); return +(100 * sum(r, "present") / sum(r, "sched")).toFixed(2); }), borderColor: T.s[0], backgroundColor: T.s[0] }], v => v.toFixed(1) + "%");
+    vbar("c-leave-mix", ms.map(mLabel), [["Planned leave", "planned", 0], ["Sick leave", "sick", 3], ["Unplanned absence", "unplanned", 1]].map(([l, k, c]) =>
+      barDs(l, ms.map(m => { const r = byM(m); return +(sum(r, k) / sum(r, "empMonths")).toFixed(2); }), T.s[c], { borderRadius: 0, borderWidth: { top: 2 }, borderSkipped: false })), v => v.toFixed(1) + " d", { stacked: true });
+    const dd = D.depts.map((d, i) => { const r = attT.filter(x => x[A.dept] === i); return [d, r]; }).filter(d => d[1].length);
+    const abs = dd.map(([d, r]) => [d, 100 * (sum(r, "sick") + sum(r, "unplanned")) / sum(r, "sched")]).sort((a, b) => b[1] - a[1]);
+    hbar("c-abs-dept", abs.map(a => a[0]), abs.map(a => +a[1].toFixed(2)), T.s[3], v => v.toFixed(1) + "%");
+    const ot = dd.map(([d, r]) => [d, sum(r, "otHours") / sum(r, "empMonths")]).sort((a, b) => b[1] - a[1]);
+    hbar("c-ot-dept", ot.map(a => a[0]), ot.map(a => +a[1].toFixed(1)), T.s[0], v => v.toFixed(1) + " h");
+  }
+
+  if (tab === "salary") {
+    const sal = act.map(e => e[C.salary]);
+    const f = act.filter(e => e[C.gender] === 0), m = act.filter(e => e[C.gender] === 1);
+    const gap = 100 * (mean(m.map(compa)) - mean(f.map(compa)));
+    const below = act.filter(e => compa(e) < 0.9).length;
+    document.getElementById("kpis-sal").innerHTML = kpiHtml([
+      { k: "Median salary", v: fmtLakh(median(sal)), n: `Average ${fmtLakh(mean(sal))}` },
+      { k: "Annual payroll", v: "₹" + (sal.reduce((a, b) => a + b, 0) / 1e7).toFixed(1) + " Cr", n: `${fmtInt(act.length)} active employees` },
+      { k: "Gender pay gap, like for like", v: isFinite(gap) ? gap.toFixed(1) + " pts" : "–", pill: isFinite(gap) ? [Math.abs(gap) > 2 ? "bad" : "good", gap > 0 ? "Men paid more" : "Women paid more"] : null },
+      { k: "Below 0.90 compa-ratio", v: fmtInt(below), n: `${fmtPct(100 * below / act.length, 0)} of active employees` },
+      { k: "April 2026 increment", v: fmtPct(mean(act.filter(e => e[C.lastInc] >= 0).map(e => e[C.lastInc]))), n: "Average, incl. promotions" },
+    ]);
+    const sd = D.depts.map((d, i) => [d, act.filter(e => e[C.dept] === i).map(e => e[C.salary])]).filter(d => d[1].length).map(([d, s]) => [d, median(s)]).sort((a, b) => b[1] - a[1]);
+    hbar("c-sal-dept", sd.map(s => s[0]), sd.map(s => +lakh(s[1]).toFixed(1)), T.s[0], v => "₹" + v + " L");
+    const lv = [1, 2, 3, 4, 5].filter(l => act.some(e => e[C.level] === l)), ls = l => act.filter(e => e[C.level] === l).map(e => e[C.salary]);
+    draw("c-sal-level", { type: "bar", data: { labels: lv.map(l => "L" + l), datasets: [
+        barDs("Range (P25–P75)", lv.map(l => [+lakh(quant(ls(l), .25)).toFixed(1), +lakh(quant(ls(l), .75)).toFixed(1)]), T.s[0] + "55", { borderSkipped: false, borderRadius: 4 }),
+        { type: "line", label: "Median", data: lv.map(l => +lakh(median(ls(l))).toFixed(1)), showLine: false, pointStyle: "line", pointRadius: 14, pointBorderWidth: 3, borderColor: T.s[0], backgroundColor: T.s[0] }] },
+      options: baseOpts({ plugins: { ...baseOpts().plugins, legend: { ...baseOpts().plugins.legend, display: true, position: "top", align: "start" },
+          tooltip: { ...baseOpts().plugins.tooltip, callbacks: { label: c => Array.isArray(c.raw) ? ` P25 ₹${c.raw[0]} L – P75 ₹${c.raw[1]} L` : ` Median ₹${c.parsed.y} L` } } },
+        scales: { x: axis({ grid: { display: false } }), y: axis({ beginAtZero: true, ticks: { ...axis().ticks, callback: v => "₹" + v + " L" } }) } }) });
+    const cd = D.depts.map((d, i) => i).filter(i => act.some(e => e[C.dept] === i));
+    const cm = (i, g) => { const a = act.filter(e => e[C.dept] === i && e[C.gender] === g); return a.length ? +mean(a.map(compa)).toFixed(3) : null; };
+    draw("c-compa", { type: "bar", data: { labels: cd.map(i => D.depts[i]), datasets: [barDs("Women", cd.map(i => cm(i, 0)), T.s[0], { maxBarThickness: 12 }), barDs("Men", cd.map(i => cm(i, 1)), T.s[2], { maxBarThickness: 12 })] },
+      options: baseOpts({ indexAxis: "y", interaction: { mode: "index", axis: "y", intersect: false }, plugins: { ...baseOpts().plugins, legend: { ...baseOpts().plugins.legend, display: true, position: "top", align: "start" },
+          tooltip: { ...baseOpts().plugins.tooltip, callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.x?.toFixed(2)}` } } },
+        scales: { x: axis({ min: 0.8, max: 1.2, ticks: { ...axis().ticks, callback: v => v.toFixed(2) } }), y: axis({ grid: { display: false } }) } }) });
+    const r = [1, 2, 3, 4, 5], inc = x => mean(act.filter(e => e[C.rating] === x && e[C.lastInc] >= 0).map(e => e[C.lastInc]));
+    vbar("c-inc", r.map(x => "Rating " + x), [barDs("Avg increment", r.map(x => +(inc(x) || 0).toFixed(1)), T.s[2])], v => v + "%");
+    const sb = [["< ₹6 L", 0, 6e5], ["₹6–10 L", 6e5, 1e6], ["₹10–15 L", 1e6, 1.5e6], ["₹15–25 L", 1.5e6, 2.5e6], ["₹25–40 L", 2.5e6, 4e6], ["₹40 L+", 4e6, 1e12]];
+    vbar("c-sal-band", sb.map(b => b[0]), [barDs("Employees", sb.map(b => sal.filter(s => s >= b[1] && s < b[2]).length), T.s[0])], v => fmtInt(v));
+  }
+}
+
+function insights(E, act, ttm, absRate) {
+  const out = [];
+  const ad = D.depts.map((d, i) => [d, attrRate(E.filter(e => e[C.dept] === i), TTM0, NOW)]).filter(d => d[1].hc >= 10).sort((a, b) => b[1].rate - a[1].rate);
+  if (ad.length > 1) out.push(["bad", "!", `<b>${ad[0][0]}</b> has the highest attrition at ${fmtPct(ad[0][1].rate)} over the last 12 months, against ${fmtPct(ttm.rate)} for the selection as a whole.`]);
+  const [no, yes] = groupRate(E, e => e[C.ot], [0, 1]);
+  if (yes && no) out.push(["bad", "!", `Employees on regular overtime have left at <b>${(yes / no).toFixed(1)}×</b> the rate of those without it (${fmtPct(yes, 0)} vs ${fmtPct(no, 0)}).`]);
+  const [s1, , , s4] = groupRate(E, e => e[C.jobSat], [1, 2, 3, 4]);
+  if (s1 && s4) out.push(["info", "i", `Job satisfaction is the strongest single signal: ${fmtPct(s1, 0)} of people scoring 1 have left, against ${fmtPct(s4, 0)} of those scoring 4.`]);
+  const ex = E.filter(e => e[C.term] > NOW - 24 && e[C.termType] === 1), rc = {};
+  ex.forEach(e => rc[e[C.reason]] = (rc[e[C.reason]] || 0) + 1);
+  const topR = Object.entries(rc).sort((a, b) => b[1] - a[1])[0];
+  if (topR) out.push(["info", "i", `The most common reason for voluntary exits in the last two years is <b>${D.reasons[topR[0]].toLowerCase()}</b> (${fmtPct(100 * topR[1] / ex.length, 0)} of voluntary exits).`]);
+  const lv = E.filter(e => e[C.term] >= 0); const early = lv.filter(e => e[C.tenure] < 1).length;
+  if (lv.length) out.push(["bad", "!", `${fmtPct(100 * early / lv.length, 0)} of all leavers went within their first year, so onboarding is where retention is won or lost.`]);
+  const f = act.filter(e => e[C.gender] === 0), m = act.filter(e => e[C.gender] === 1);
+  if (f.length > 5 && m.length > 5) { const g = 100 * (mean(m.map(compa)) - mean(f.map(compa))); out.push([Math.abs(g) > 2 ? "bad" : "good", Math.abs(g) > 2 ? "!" : "✓", `At the same department and level, men are paid ${g >= 0 ? "" : "−"}${Math.abs(g).toFixed(1)} points ${g >= 0 ? "above" : "below"} women on compa-ratio.`]); }
+  document.getElementById("insights").innerHTML = out.map(([c, i, t]) => `<li><span class="ic ${c}" aria-hidden="true">${i}</span><span>${t}</span></li>`).join("");
+}
+
+// Re-render on theme changes so chart colors follow the page.
+new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render); } catch (e) {}
+if (window.Chart) { Chart.defaults.font.family = "Hanken Grotesk, system-ui, sans-serif"; }
+showTab();
+</script>

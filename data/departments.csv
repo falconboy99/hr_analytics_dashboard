@@ -1,0 +1,9 @@
+department_id,department_name,cost_center
+1,Engineering,CC-110
+2,Sales,CC-120
+3,Customer Support,CC-130
+4,Operations,CC-140
+5,Marketing,CC-150
+6,Product,CC-160
+7,Finance,CC-170
+8,Human Resources,CC-180
